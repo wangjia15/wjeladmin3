@@ -1,0 +1,79 @@
+version: '1'
+services:
+  eladmin-nginx:
+    container_name: eladmin-nginx
+    build:
+      context: ./
+      dockerfile: ./eladmin-docker/eladmin-nginx/nginx-Dockerfile
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+    - "8088:80"
+    volumes:
+    - ~/.eladmin/logs/nginx:/var/log/nginx
+    depends_on:
+    - eladmin-server
+    - eladmin-admin
+    - eladmin-redis
+
+  eladmin-mysql:
+    container_name: eladmin-mysql
+    build:
+      context: ./
+      dockerfile: ./eladmin-docker/eladmin-mysql/mysql-Dockerfile
+    environment:
+      MYSQL_DATABASE: eladmin
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_HOST: '%'
+      TZ: Asia/Shanghai
+    expose:
+    - "3306"
+    volumes:
+    - ~/.eladmin/mysql/mysql_data:/var/lib/mysql
+    restart: always
+
+  eladmin-server:
+    container_name: eladmin-server
+    build:
+      context: ./
+      dockerfile: ./eladmin-docker/eladmin-server-Dockerfile
+    working_dir: /app
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+    - ./eladmin-server:/app
+    - ~/.m2:/root/.m2
+    - #~/.eladmin/logs/server:/app/log
+    - #~/.eladmin/upload:/root/.fame/upload
+    expose:
+    - "9090"
+    command: mvn clean spring-boot:run -Dspring-boot.run.profiles=docker -Dmaven.test.skip=true
+    depends_on:
+    - eladmin-mysql
+    - eladmin-redis
+    restart: always
+
+  eladmin-admin:
+    container_name: eladmin-admin
+    build:
+      context: ./
+      dockerfile: ./eladmin-docker/eladmin-admin/eladmin-admin-Dockerfile
+    environment:
+      TZ: Asia/Shanghai
+    expose:
+    - "3001"
+
+  eladmin-redis:
+    image: redis:4.0.13 
+    container_name: eladmin-redis
+    restart: always
+    command: --appendonly yes
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis_data:/data
+
+networks:
+   default:
+     external:
+       name: eladmin-proxy
